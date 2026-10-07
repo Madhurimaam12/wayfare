@@ -20,18 +20,53 @@ const expenseRoutes = require('./routes/expenseRoutes');
 
 const app = express();
 
-// Middleware
+// ============ CORS CONFIGURATION ============
+// Allow local development AND Vercel deployments
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://wayfare-5lwi.vercel.app',
+];
+
 app.use(cors({
-  origin: 'http://localhost:5173',
-  credentials: true
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, Postman, curl)
+    if (!origin) return callback(null, true);
+
+    // Allow localhost
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
+    }
+
+    // Allow any *.vercel.app subdomain
+    if (origin.endsWith('.vercel.app')) {
+      return callback(null, true);
+    }
+
+    // Allow any vercel preview URL
+    if (origin.includes('vercel.app')) {
+      return callback(null, true);
+    }
+
+    console.log('CORS blocked origin:', origin);
+    return callback(null, true); // TEMPORARY: allow all for debugging
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
 
+// Handle preflight requests
+app.options('*', cors());
+
+// ============ BODY PARSERS ============
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Static files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // ============ DATABASE CONNECTION ============
-// This is the EXACT same code that just worked in the test!
 const connectDB = async () => {
   try {
     console.log('Connecting to MongoDB Atlas...');
@@ -69,7 +104,8 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'OK',
     message: 'Wayfare API is running',
-    database: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'
+    database: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -81,7 +117,7 @@ app.use('/api/policies', policyRoutes);
 app.use('/api/travel-requests', travelRequestRoutes);
 app.use('/api/expenses', expenseRoutes);
 
-// 404
+// ============ 404 HANDLER ============
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -89,9 +125,10 @@ app.use((req, res) => {
   });
 });
 
-// Error handler
+// ============ ERROR HANDLER ============
 app.use((err, req, res, next) => {
   console.error('Error:', err.message);
+  console.error(err.stack);
   res.status(err.statusCode || 500).json({
     success: false,
     message: err.message || 'Server Error'
@@ -117,7 +154,7 @@ const startServer = async () => {
     console.log('════════════════════════════════════════');
     console.log(`Wayfare server running on port ${PORT}`);
     console.log(`http://localhost:${PORT}/api`);
-    console.log(`Database: ${mongoose.connection.readyState === 1 ? '✅ Connected' : '❌ Disconnected'}`);
+    console.log(`Database: ${mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'}`);
     console.log('════════════════════════════════════════');
     console.log('');
   });
