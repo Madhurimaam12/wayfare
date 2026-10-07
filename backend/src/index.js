@@ -57,7 +57,7 @@ app.use(cors({
 }));
 
 // Handle preflight requests
-app.options('*', cors());
+app.options('/*splat', cors());
 
 // ============ BODY PARSERS ============
 app.use(express.json({ limit: '10mb' }));
